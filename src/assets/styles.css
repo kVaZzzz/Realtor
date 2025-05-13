@@ -1,0 +1,8 @@
+/* src/assets/styles.css */
+@font-face {
+    font-family: "NotoSans";
+    font-weight: 400;
+    font-style: normal;
+    font-display: auto;
+    src: local("NotoSans"), url("fonts/NotoSans-Regular.ttf") format("ttf");
+}
