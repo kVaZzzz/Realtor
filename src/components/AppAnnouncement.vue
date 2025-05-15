@@ -167,6 +167,32 @@
         </div>
       </div>
     </div>
+    <section class="similar-ads" v-if="similarListings.length > 0">
+      <h2>Похожие варианты ({{ currentAd.count_rooms }} комн. в этом же ценовом диапазоне)</h2>
+      <div class="similar-listings">
+        <div
+            v-for="listing in similarListings"
+            :key="listing.id"
+            class="similar-listing"
+            @click="goToAnnouncement(listing.id)"
+        >
+          <img :src="listing.images[0] || defaultImage" alt="Фото" class="similar-image">
+          <div class="similar-info">
+            <div class="similar-price" :class="{ 'lower-price': listing.price < currentAd.price }">
+              {{ formatPrice(listing.price) }} ₽/мес
+              <span v-if="listing.price < currentAd.price" class="price-diff">
+                (дешевле на {{ calculatePriceDiff(listing.price) }}%)
+              </span>
+            </div>
+            <div class="similar-details">
+              <span>{{ listing.total_square }} м²</span>
+              <span>{{ listing.floor }}/{{ listing.max_floor }} эт.</span>
+            </div>
+            <div class="similar-address">{{ listing.address }}</div>
+          </div>
+        </div>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -192,6 +218,15 @@ const defaultImage = ref('/images/default-apartment.jpg');
 const currentUserId = ref(Cookies.get('userId'));
 const viewsCount = ref(0);
 const cookieName = `ad_${apartmentId}_viewed`;
+const similarListings = ref([]);
+
+
+const currentAd = ref({
+  id: null,
+  price: 0,
+  count_rooms: '',
+  images: []
+});
 
 const apartment = ref({
   id: null,
@@ -562,15 +597,175 @@ const generateExcel = () => {
     alert('Не удалось создать Excel отчёт');
   }
 };
+const fetchData = async () => {
+  try {
+    // Загружаем текущее объявление
+    const adResponse = await axios.get(`${thisUrl()}/realty/show/${route.params.id}`);
+    currentAd.value = adResponse.data;
+
+    // Загружаем похожие объявления
+    await fetchSimilarListings();
+  } catch (error) {
+    console.error('Ошибка загрузки данных:', error);
+  }
+};
+
+// Загрузка похожих объявлений
+const fetchSimilarListings = async () => {
+  try {
+    const params = {
+      count_rooms: currentAd.value.count_rooms, // То же количество комнат
+      min_price: Math.floor(currentAd.value.price * 0.85),  // -15%
+      max_price: Math.ceil(currentAd.value.price * 1.15),   // +15%
+      exclude_id: currentAd.value.id,
+      limit: 4,
+      sort: 'price'
+    };
+
+    const response = await axios.get(`${thisUrl()}/realty/filter`, { params });
+    similarListings.value = response.data.listings || [];
+
+    // Если результатов мало, расширяем поиск
+    if (similarListings.value.length < 2) {
+      await loadAlternativeOptions();
+    }
+  } catch (error) {
+    console.error('Ошибка загрузки похожих объявлений:', error);
+  }
+};
+
+// Загрузка альтернативных вариантов
+const loadAlternativeOptions = async () => {
+  try {
+    const roomsRange = getRoomsRange(currentAd.value.count_rooms);
+    const response = await axios.get(`${thisUrl()}/realty/filter`, {
+      params: {
+        count_rooms: roomsRange,
+        min_price: Math.floor(currentAd.value.price * 0.7),  // Расширяем диапазон
+        max_price: Math.ceil(currentAd.value.price * 1.3),
+        exclude_id: currentAd.value.id,
+        limit: 4 - similarListings.value.length
+      }
+    });
+
+    similarListings.value = [...similarListings.value, ...(response.data.listings || [])];
+  } catch (error) {
+    console.error('Ошибка загрузки альтернативных вариантов:', error);
+  }
+};
+
+// Определение диапазона комнат
+const getRoomsRange = (rooms) => {
+  if (rooms === 'студия') return ['студия', '1'];
+  if (rooms === '1') return ['студия', '1', '2'];
+  if (rooms === '6+') return ['5', '6+'];
+  const num = parseInt(rooms);
+  return [`${num-1}`, `${num}`, `${num+1}`];
+};
+
+// Форматирование цены
+const formatPrice = (price) => {
+  return new Intl.NumberFormat('ru-RU').format(price);
+};
+
+// Расчет разницы в цене
+const calculatePriceDiff = (price) => {
+  return Math.round((currentAd.value.price - price) / currentAd.value.price * 100);
+};
+
+// Переход к объявлению
+const goToAnnouncement = (id) => {
+  router.push(`/announcement/${id}`);
+};
 
 onMounted(() => {
   fetchApartmentData();
+  fetchData();
 });
 </script>
 
 <style scoped>
 main {
   background-color: rgba(242, 240, 238, 1);
+}
+
+.similar-ads {
+  margin-top: 40px;
+  padding: 20px 0;
+  border-top: 1px solid #eee;
+  margin-left: 8%;
+}
+
+.similar-ads h2 {
+  font-size: 22px;
+  margin-bottom: 20px;
+  color: #333;
+  font-weight: 600;
+}
+
+.similar-listings {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.similar-listing {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: white;
+}
+
+.similar-listing:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.similar-image {
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+  border-bottom: 1px solid #eee;
+}
+
+.similar-info {
+  padding: 15px;
+}
+
+.similar-price {
+  font-weight: bold;
+  font-size: 18px;
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.lower-price {
+  color: #2e7d32;
+}
+
+.price-diff {
+  font-size: 13px;
+  color: #388e3c;
+  margin-left: 5px;
+  font-weight: normal;
+}
+
+.similar-details {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: #666;
+}
+
+.similar-address {
+  font-size: 14px;
+  color: #555;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .views-counter {
   margin: 8px 0;
@@ -585,6 +780,7 @@ main {
   background-color: rgba(242, 240, 238, 1);
   width: 100%;
   min-height: 100vh;
+  flex-direction: column;
 }
 
 .content-container {

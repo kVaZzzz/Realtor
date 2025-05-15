@@ -5,6 +5,20 @@
       <div class="adv">
         <span class="label"> {{ totalItems }} ОБЪЯВЛЕНИЯ</span>
       </div>
+      <div v-if="comparedAds.length > 0" class="compare-bar">
+        <div class="compare-bar-content">
+          <span>Выбрано: {{ comparedAds.length }}</span>
+          <button @click="openCompareModal">Сравнить ({{ comparedAds.length }})</button>
+          <button @click="clearComparison">Очистить</button>
+        </div>
+      </div>
+
+      <!-- Модальное окно сравнения -->
+      <CompareModal
+          v-if="showCompareModal"
+          :adIds="comparedAds"
+          @close="showCompareModal = false"
+      />
       <div class="search-and-sort">
         <input
             type="text"
@@ -298,6 +312,13 @@
                   <strong>{{ listing.complex }}</strong>
                 </p>
               </div>
+              <button
+                  class="compare-btn"
+                  @click.stop="toggleCompare(listing.id)"
+                  :class="{ 'active': isSelectedForCompare(listing.id) }"
+              >
+                {{ isSelectedForCompare(listing.id) ? '✓ В сравнении' : 'Сравнить' }}
+              </button>
             </div>
           </template>
           <template v-else>
@@ -321,6 +342,7 @@ import { useRouter } from 'vue-router';
 import Cookies from 'js-cookie';
 import shape from "@/assets/shape.png";
 import fullShape from "@/assets/full_shape.png";
+import CompareModal from './CompareModal.vue';
 
 const router = useRouter();
 const getToken = () => Cookies.get('authToken') || '';
@@ -611,6 +633,51 @@ const toggleFavorite = async (listingId, index) => {
     }
   }
 };
+const comparedAds = ref([]);
+const showCompareModal = ref(false);
+
+// Проверяем, выбрано ли объявление для сравнения
+const isSelectedForCompare = (id) => {
+  return comparedAds.value.includes(id);
+};
+
+// Добавляем/удаляем объявление из сравнения
+const toggleCompare = (id) => {
+  if (isSelectedForCompare(id)) {
+    comparedAds.value = comparedAds.value.filter(adId => adId !== id);
+  } else {
+    if (comparedAds.value.length < 4) { // Ограничиваем сравнение 4 объявлениями
+      comparedAds.value.push(id);
+    } else {
+      alert('Можно сравнить не более 4 объявлений');
+    }
+  }
+  // Сохраняем в localStorage
+  localStorage.setItem('comparedAds', JSON.stringify(comparedAds.value));
+};
+
+// Очищаем сравнение
+const clearComparison = () => {
+  comparedAds.value = [];
+  localStorage.removeItem('comparedAds');
+};
+
+// Открываем модальное окно сравнения
+const openCompareModal = () => {
+  if (comparedAds.value.length < 2) {
+    alert('Выберите минимум 2 объявления для сравнения');
+    return;
+  }
+  showCompareModal.value = true;
+};
+
+// Загружаем сохраненные сравнения при монтировании
+onMounted(() => {
+  const saved = localStorage.getItem('comparedAds');
+  if (saved) {
+    comparedAds.value = JSON.parse(saved);
+  }
+});
 
 watch(currentPage, fetchData);
 
@@ -620,6 +687,63 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.compare-btn {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  z-index: 2;
+  transition: all 0.2s;
+  font-size: 14px;
+}
+
+.compare-btn:hover {
+  background: #f0f0f0;
+}
+
+.compare-btn.active {
+  background: rgba(255, 120, 79, 0.9);
+  color: white;
+  border-color: rgba(255, 120, 79, 1);
+}
+
+/* Стили для панели сравнения */
+.compare-bar {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.compare-bar button {
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.compare-bar button:first-of-type {
+  background: rgba(255, 120, 79, 1);
+  color: white;
+  border: none;
+}
+
+.compare-bar button:last-of-type {
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+}
 .dots {
   color: white;
   font-size: 18px;

@@ -20,7 +20,6 @@
                 class="listing-image"
                 @error="handleImageError"
             />
-            <span v-if="listing.old_price" class="good-price">Хорошая цена</span>
             <img
                 class="heart-on-image"
                 @click.stop="toggleFavorite(listing.id, index)"
