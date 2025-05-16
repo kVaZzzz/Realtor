@@ -80,6 +80,9 @@
             <button class="generate-excel-button" @click="generateExcel">
               Скачать Excel отчёт
             </button>
+            <button class="generate-csv-button" @click="generateCSV">
+              Скачать CSV отчёт
+            </button>
           </div>
         </div>
       </section>
@@ -535,6 +538,66 @@ const generateDOCX = async () => {
   }
 };
 
+const generateCSV = () => {
+  try {
+    // Подготовка данных
+    const data = [
+      ["Параметр", "Значение"],
+      ["ID объявления", apartment.value.id],
+      ["Адрес", apartment.value.address || 'Не указан'],
+      ["Цена", `${formattedPrice.value} ₽ / мес`],
+      ["Тип аренды", apartment.value.type_rent?.title || 'Не указано'],
+      ["Тип недвижимости", apartment.value.type_realty?.title || 'Не указано'],
+      ["Количество комнат", apartment.value.count_rooms || 'Не указано'],
+      ["Общая площадь", `${apartment.value.total_square || 'Не указано'} м²`],
+      ["Жилая площадь", `${apartment.value.living_square || 'Не указано'} м²`],
+      ["Площадь кухни", `${apartment.value.kitchen_square || 'Не указано'} м²`],
+      ["Этаж", `${apartment.value.floor || 'Не указано'} из ${apartment.value.max_floor || 'Не указано'}`],
+      ["Год постройки", apartment.value.year_construction || 'Не указано'],
+      ["Ремонт", apartment.value.type_repair?.title || 'Не указано'],
+      ["Просмотры", viewsCount.value],
+      ["Средний рейтинг", averageRating.value.toFixed(1)],
+      ["Количество отзывов", apartment.value.reviews?.length || 0],
+      ["Контакты", showPhone.value ? apartment.value.owner.phone : 'Скрыто'],
+      ["Описание", apartment.value.description || 'Отсутствует'],
+    ];
+
+    // Добавляем отзывы, если они есть
+    if (apartment.value.reviews && apartment.value.reviews.length > 0) {
+      data.push([]); // Пустая строка для разделения
+      data.push(["Отзывы", "", "", ""]);
+      data.push(["Автор", "Оценка", "Комментарий", "Дата"]);
+
+      apartment.value.reviews.forEach(review => {
+        data.push([
+          review.user.name,
+          review.rating,
+          review.comment,
+          new Date(review.created_at).toLocaleDateString()
+        ]);
+      });
+    }
+
+    // Конвертируем в CSV
+    let csvContent = "data:text/csv;charset=utf-8,";
+    data.forEach(row => {
+      csvContent += row.map(field => `"${field}"`).join(",") + "\r\n";
+    });
+
+    // Создаем ссылку для скачивания
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `apartment_report_${apartment.value.id}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } catch (error) {
+    console.error('Ошибка генерации CSV:', error);
+    alert('Не удалось создать CSV отчёт');
+  }
+};
+
 const generateExcel = () => {
   try {
     // Подготовка данных для Excel
@@ -688,7 +751,21 @@ onMounted(() => {
 main {
   background-color: rgba(242, 240, 238, 1);
 }
+.generate-csv-button {
+  background-color: #28a745;
+  color: white;
+  padding: 10px 15px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  margin-right: 10px;
+  transition: background-color 0.3s;
+}
 
+.generate-csv-button:hover {
+  background-color: #218838;
+}
 .similar-ads {
   margin-top: 40px;
   padding: 20px 0;
